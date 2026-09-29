@@ -1,6 +1,6 @@
 # Paths to Philosophy
 
-[Open the hosted site](https://paths-to-philosophy-joaquim.quimpedro1997.chatgpt.site) (private to the owner).
+[Open the hosted site](https://joaquimcoelho.github.io/wikipedia-philosophy-graph/).
 
 An interactive graph for exploring the [Wikipedia first-link phenomenon](https://en.wikipedia.org/wiki/Wikipedia:Getting_to_Philosophy). Enter any English Wikipedia article title or URL; the app fetches its current rendered article through the MediaWiki Action API, finds the first eligible article link in the main text, and repeats until it reaches Philosophy, encounters a loop, runs out of links, or reaches a 100-step safety limit.
 
@@ -19,6 +19,6 @@ Then open `http://localhost:8000`. A network connection is needed to query Engli
 
 ## How links are chosen
 
-The parser reads rendered article paragraphs in order. It skips navigation boxes, infoboxes, hatnotes, references, links inside parentheses, italicized links, and non-article namespaces. Wikipedia markup is complex, so unusual pages may yield a different first link than a human reader expects. Redirects are resolved by the API before adding nodes to the graph.
+The parser reads rendered article paragraphs in order, including links inside parentheses. It skips navigation boxes, infoboxes, hatnotes, references, italicized links, and non-article namespaces. Wikipedia markup is complex, so unusual pages may yield a different first link than a human reader expects. Redirects are resolved by the API before adding nodes to the graph.
 
-The code for the deployable static site is in [`philosophy-graph-site/dist`](philosophy-graph-site/dist). The `.openai/hosting.json` file configures its Sites deployment.
+The code for the deployable static site is in [`philosophy-graph-site/dist`](philosophy-graph-site/dist). GitHub Actions deploys this directory to GitHub Pages on every push to `main`.

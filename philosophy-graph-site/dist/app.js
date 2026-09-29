@@ -54,24 +54,16 @@
     const root = doc.querySelector('.mw-parser-output') || doc.body;
     const paragraphs = [...root.querySelectorAll('p')].filter(p => !isExcluded(p));
     for (const paragraph of paragraphs) {
-      let depth = 0;
       let found = null;
       function visit(node, italic = false) {
         if (found) return;
-        if (node.nodeType === Node.TEXT_NODE) {
-          for (const char of node.nodeValue) {
-            if (char === '(' || char === '（') depth++;
-            else if (char === ')' || char === '）') depth = Math.max(0, depth - 1);
-          }
-          return;
-        }
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const el = node;
         if (el !== paragraph && (el.matches('sup,style,script') || isExcluded(el))) return;
         const inItalic = italic || el.matches('i,em');
         if (el.tagName === 'A') {
           const target = targetFromHref(el.getAttribute('href'));
-          if (target && !inItalic && !depth && !el.classList.contains('new')) { found = target; return; }
+          if (target && !inItalic && !el.classList.contains('new')) { found = target; return; }
         }
         for (const child of el.childNodes) visit(child, inItalic);
       }
@@ -283,7 +275,7 @@
   }
   addNode('Philosophy');
   const examples = [
-    { start: 'Cat', titles: ['Cat', 'Carnivore', 'Animal', 'Multicellular organism', 'Organism', 'Life', 'Matter', 'Outline of physical science', 'Natural science', 'Empiricism', 'Epistemology', 'Philosophy'], outcome: 'reached', color: colors[0], sample: true },
+    { start: 'Cat', titles: ['Cat', 'Carnivore', 'Latin', 'Classical language', 'Language', 'Communication', 'Information', 'Abstract and concrete', 'Philosophy'], outcome: 'reached', color: colors[0], sample: true },
     { start: 'Moon', titles: ['Moon', 'Natural satellite', 'Astronomical object', 'Universe', 'Existence', 'Reality', 'Existence'], outcome: 'loop', color: colors[1], sample: true }
   ];
   for (const path of examples) {
