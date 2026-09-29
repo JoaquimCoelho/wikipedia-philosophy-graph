@@ -12,8 +12,9 @@
     detailLink: document.getElementById('detail-link'), detailSymbol: document.querySelector('.detail-symbol'),
     nodeCount: document.getElementById('node-count'), pathCount: document.getElementById('path-count'), stepCount: document.getElementById('step-count')
   };
-  const colors = ['#d6f878', '#83d8d1', '#ffbd89', '#c9a9ff', '#ff91a6', '#8bb7ff'];
-  const state = { nodes: new Map(), edges: new Map(), paths: [], pageCache: new Map(), selected: 'Philosophy', activePath: null, busy: false, scale: 1, tx: 0, ty: 0, pointer: null, raf: 0, frames: 0 };
+  const colors = ['#d6f878', '#83d8d1', '#c9a9ff', '#8bb7ff'];
+  const LOOP_COLOR = '#ff9b70';
+  const state = { nodes: new Map(), edges: new Map(), paths: [], pageCache: new Map(), loopTargets: new Map(), cycleEdges: new Map(), selected: 'Philosophy', activePath: null, busy: false, scale: 1, tx: 0, ty: 0, pointer: null, raf: 0, frames: 0 };
 
   function setStatus(message, error = false) {
     els.status.textContent = message;
@@ -107,8 +108,55 @@
     return node;
   }
   function addEdge(from, to) { const key = `${from}\u0000${to}`; if (!state.edges.has(key)) state.edges.set(key, { from, to }); }
+  function pathEdgeKeys(path) { return path.titles.slice(1).map((title, i) => `${path.titles[i]}\u0000${title}`); }
+  function layoutLoops() {
+    state.loopTargets.clear(); state.cycleEdges.clear();
+    const cycles = new Map();
+    let right = 180;
+    for (const path of state.paths.filter(path => path.outcome === 'loop')) {
+      const last = path.titles.at(-1);
+      const entry = path.titles.findIndex(title => title.toLowerCase() === last.toLowerCase());
+      const titles = path.titles.slice(entry, -1);
+      if (!titles.length) continue;
+      const key = titles.map(title => title.toLowerCase()).sort().join('\u0000');
+      let cycle = cycles.get(key);
+      if (!cycle) {
+        const radius = Math.max(90, titles.length * 135 / (2 * Math.PI));
+        cycle = { x: right + radius, y: 0, radius };
+        right += radius * 2 + 230;
+        cycles.set(key, cycle);
+        titles.forEach((title, i) => {
+          const angle = -Math.PI / 2 + i * 2 * Math.PI / titles.length;
+          state.loopTargets.set(title, { x: cycle.x + radius * Math.cos(angle), y: cycle.y + radius * Math.sin(angle) });
+          const next = titles[(i + 1) % titles.length];
+          state.cycleEdges.set(`${title}\u0000${next}`, { ...cycle, start: angle, end: angle + 2 * Math.PI / titles.length });
+        });
+      }
+      // Keep the approach outside the ring; repeated routes share the same cycle.
+      const entryTarget = state.loopTargets.get(titles[0]);
+      const dx = (entryTarget.x - cycle.x) / cycle.radius, dy = (entryTarget.y - cycle.y) / cycle.radius;
+      for (let i = entry - 1; i >= 0; i--) {
+        const title = path.titles[i];
+        if (!state.loopTargets.has(title)) {
+          const distance = (entry - i) * 115;
+          state.loopTargets.set(title, { x: entryTarget.x + dx * distance, y: entryTarget.y + dy * distance });
+        }
+      }
+    }
+    for (const [title, target] of state.loopTargets) {
+      const node = state.nodes.get(title);
+      if (node) { node.x = target.x; node.y = target.y; node.vx = 0; node.vy = 0; }
+    }
+  }
+  function cycleArc(cycle) {
+    const gap = 15 / cycle.radius;
+    const start = cycle.start + gap, end = cycle.end - gap;
+    const x1 = cycle.x + cycle.radius * Math.cos(start), y1 = cycle.y + cycle.radius * Math.sin(start);
+    const x2 = cycle.x + cycle.radius * Math.cos(end), y2 = cycle.y + cycle.radius * Math.sin(end);
+    return `M ${x1} ${y1} A ${cycle.radius} ${cycle.radius} 0 ${end - start > Math.PI ? 1 : 0} 1 ${x2} ${y2}`;
+  }
   function outcomeText(path) {
-    if (path.sample) return `Example snapshot · ${path.titles.length - 1} links`;
+    if (path.sample) return `Example snapshot · ${path.outcome === 'loop' ? 'Loop · ' : ''}${path.titles.length - 1} links`;
     if (path.outcome === 'reached') return `Reached Philosophy · ${path.titles.length - 1} links`;
     if (path.outcome === 'loop') return `Loop detected · ${path.titles.length - 1} links`;
     if (path.outcome === 'dead') return `No eligible link · ${path.titles.length - 1} links`;
@@ -120,9 +168,10 @@
     els.list.replaceChildren();
     if (!state.paths.length) { const p = document.createElement('p'); p.className = 'empty-list'; p.textContent = 'Your traced routes will appear here.'; els.list.append(p); return; }
     [...state.paths].reverse().forEach(path => {
-      const card = document.createElement('div'); card.className = 'path-card' + (state.activePath === path ? ' active' : '');
+      const loop = path.outcome === 'loop';
+      const card = document.createElement('div'); card.className = 'path-card' + (state.activePath === path ? ' active' : '') + (loop ? ' loop' : '');
       const button = document.createElement('button'); button.type = 'button'; button.setAttribute('aria-label', `Highlight path from ${path.start}`);
-      const dot = document.createElement('span'); dot.className = 'path-dot'; dot.style.background = path.color;
+      const dot = document.createElement('span'); dot.className = 'path-dot'; dot.style.background = loop ? LOOP_COLOR : path.color;
       const title = document.createElement('span'); title.className = 'path-title'; title.textContent = path.start;
       const steps = document.createElement('span'); steps.className = 'path-steps'; steps.textContent = String(path.titles.length - 1).padStart(2, '0');
       button.append(dot, title, steps); button.addEventListener('click', () => { state.activePath = state.activePath === path ? null : path; render(); });
@@ -143,17 +192,25 @@
   function renderGraph() {
     els.edges.replaceChildren(); els.nodes.replaceChildren();
     const active = state.activePath;
-    const activeEdges = new Set(active ? active.titles.slice(1).map((t, i) => `${active.titles[i]}\u0000${t}`) : []);
+    const activeEdges = new Set(active ? pathEdgeKeys(active) : []);
     const activeNodes = new Set(active ? active.titles : []);
+    const loopPaths = state.paths.filter(path => path.outcome === 'loop');
+    const loopEdges = new Set(loopPaths.flatMap(pathEdgeKeys));
+    const loopNodes = new Set(loopPaths.flatMap(path => path.titles));
     for (const edge of state.edges.values()) {
       const from = state.nodes.get(edge.from), to = state.nodes.get(edge.to);
       if (!from || !to) continue;
-      const line = element('line', { x1: from.x, y1: from.y, x2: to.x, y2: to.y, class: 'edge' + (activeEdges.has(`${edge.from}\u0000${edge.to}`) ? ' active' : '') });
+      const key = `${edge.from}\u0000${edge.to}`;
+      const cycle = state.cycleEdges.get(key);
+      const attrs = { class: 'edge' + (activeEdges.has(key) ? ' active' : '') + (loopEdges.has(key) ? ' loop' : '') + (cycle ? ' cycle' : '') };
+      const length = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
+      const inset = loopEdges.has(key) ? 14 / length : 0;
+      const line = cycle ? element('path', { ...attrs, d: cycleArc(cycle) }) : element('line', { ...attrs, x1: from.x, y1: from.y, x2: to.x - (to.x - from.x) * inset, y2: to.y - (to.y - from.y) * inset });
       els.edges.append(line);
     }
     for (const node of state.nodes.values()) {
       const root = node.title === 'Philosophy';
-      const g = element('g', { class: `node${root ? ' root' : ''}${activeNodes.has(node.title) ? ' active' : ''}${state.selected === node.title ? ' selected' : ''}`, transform: `translate(${node.x} ${node.y})`, tabindex: '0', role: 'button', 'aria-label': `Select ${node.title}` });
+      const g = element('g', { class: `node${root ? ' root' : ''}${activeNodes.has(node.title) ? ' active' : ''}${loopNodes.has(node.title) ? ' loop' : ''}${state.selected === node.title ? ' selected' : ''}`, transform: `translate(${node.x} ${node.y})`, tabindex: '0', role: 'button', 'aria-label': `Select ${node.title}` });
       const circle = element('circle', { r: root ? '19' : '10' });
       const label = element('text', { x: root ? '0' : '0', y: root ? '-31' : '-19', 'text-anchor': 'middle' }); label.textContent = node.title;
       if (root) { const phi = element('text', { x: '0', y: '10', 'text-anchor': 'middle', style: 'fill:#17261c;stroke:none;font:29px Georgia,serif' }); phi.textContent = 'Φ'; g.append(circle, phi, label); }
@@ -176,6 +233,10 @@
     const rect = els.svg.getBoundingClientRect();
     const nodes = [...state.nodes.values()];
     const xs = nodes.map(n => n.x), ys = nodes.map(n => n.y);
+    for (const cycle of state.cycleEdges.values()) {
+      xs.push(cycle.x - cycle.radius, cycle.x + cycle.radius);
+      ys.push(cycle.y - cycle.radius, cycle.y + cycle.radius);
+    }
     const minX = Math.min(...xs) - 105, maxX = Math.max(...xs) + 105, minY = Math.min(...ys) - 80, maxY = Math.max(...ys) + 80;
     state.scale = Math.max(.2, Math.min(1.5, Math.min((rect.width - 75) / (maxX - minX), (rect.height - 100) / (maxY - minY))));
     state.tx = rect.width / 2 - ((minX + maxX) / 2) * state.scale;
@@ -199,7 +260,7 @@
       forces.get(b.title).x -= dx / dist * force; forces.get(b.title).y -= dy / dist * force;
     }
     for (const node of nodes) {
-      if (node.title === 'Philosophy') continue;
+      if (node.title === 'Philosophy' || state.loopTargets.has(node.title)) continue;
       const force = forces.get(node.title);
       node.vx = (node.vx + force.x - node.x * .0005) * .82;
       node.vy = (node.vy + force.y - node.y * .0005) * .82;
@@ -241,7 +302,7 @@
       }
     } catch (error) { path.outcome = 'error'; path.error = error.message || 'Could not finish this path.'; }
     finally {
-      state.busy = false; els.button.disabled = false; render();
+      state.busy = false; els.button.disabled = false; layoutLoops(); render(); kick();
       const summary = outcomeText(path);
       setStatus(`${path.start}: ${summary}`, path.outcome === 'error');
       if (path.titles.length) { selectNode(path.titles[0]); fitGraph(); }
@@ -251,6 +312,7 @@
   }
   function resetGraph() {
     state.nodes.clear(); state.edges.clear(); state.paths = []; state.activePath = null;
+    state.loopTargets.clear(); state.cycleEdges.clear();
     addNode('Philosophy'); selectNode('Philosophy'); render(); fitGraph();
   }
   els.form.addEventListener('submit', event => { event.preventDefault(); trace(els.input.value).catch(error => setStatus(error.message, true)); });
@@ -293,6 +355,6 @@
       if (i < path.titles.length - 1) addEdge(title, path.titles[i + 1]);
     }
   }
-  render(); kick(); requestAnimationFrame(fitGraph);
+  layoutLoops(); render(); kick(); requestAnimationFrame(fitGraph);
   setStatus('Example paths from 29 September 2026. Trace an article for live results.');
 })();
