@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101923">
+  <meta name="description" content="Trace the first-link route from any English Wikipedia article and explore how paths converge on Philosophy.">
+  <title>Paths to Philosophy — a Wikipedia first-link explorer</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101923'/%3E%3Cpath d='M14 45 31 17l18 28M22 33h19' fill='none' stroke='%23d6f878' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">Φ</span><div><strong>Paths to Philosophy</strong><small>THE FIRST-LINK EXPERIMENT</small></div></div>
+      <a class="article-link" href="https://en.wikipedia.org/wiki/Wikipedia:Getting_to_Philosophy" target="_blank" rel="noopener noreferrer">Read the idea <span aria-hidden="true">↗</span></a>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar" aria-label="Trace controls and paths">
+        <div class="intro"><div class="eyebrow"><span class="pulse-dot"></span> LIVE WIKIPEDIA GRAPH</div><h1>Where does a page <em>lead?</em></h1><p>Follow the first eligible link in each article. Watch the route unfold, merge, loop, or stop.</p></div>
+        <form id="trace-form" autocomplete="off">
+          <label for="article-input">START WITH AN ARTICLE</label>
+          <div class="search-row"><input id="article-input" name="article" type="text" placeholder="Try “Cat” or paste a Wikipedia URL" spellcheck="false" aria-describedby="input-help"><button type="submit" id="trace-button" aria-label="Trace article">Trace <span aria-hidden="true">→</span></button></div>
+          <div id="input-help" class="hint">English Wikipedia articles · press Enter to trace</div>
+        </form>
+        <div class="examples"><span>EXPLORE A PATH</span><div class="chip-row"><button type="button" class="chip" data-example="Cat">Cat</button><button type="button" class="chip" data-example="Moon">Moon</button><button type="button" class="chip" data-example="Jazz">Jazz</button><button type="button" class="chip" data-example="Mathematics">Mathematics</button></div></div>
+        <div class="panel-heading"><span>TRACED PATHS</span><button id="clear-button" type="button" title="Clear graph">Clear</button></div>
+        <div id="path-list" class="path-list" aria-live="polite"><p class="empty-list">Your traced routes will appear here.</p></div>
+        <div class="sidebar-foot">Based on the <a href="https://en.wikipedia.org/wiki/Wikipedia:Getting_to_Philosophy" target="_blank" rel="noopener noreferrer">Wikipedia essay</a>. The 97% figure often quoted for this phenomenon is from 2016; live results can differ.</div>
+      </aside>
+
+      <section class="graph-area" aria-label="Interactive article graph">
+        <div class="graph-top"><div><span class="section-kicker">THE KNOWLEDGE NETWORK</span><h2>Every link is a step.</h2></div><div class="stats"><div><strong id="node-count">1</strong><span>PAGES</span></div><div><strong id="path-count">0</strong><span>PATHS</span></div><div><strong id="step-count">0</strong><span>LINKS</span></div></div></div>
+        <div class="canvas-wrap" id="canvas-wrap">
+          <svg id="graph" role="img" aria-label="Graph of traced Wikipedia first-link routes"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="19" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#79909a"/></marker></defs><g id="viewport"><g id="edges"></g><g id="nodes"></g></g></svg>
+          <div class="canvas-note"><span class="live-indicator"></span><span id="status" role="status">Choose an article to begin</span></div>
+          <div class="graph-controls"><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="fit" aria-label="Fit graph to view">⌗</button></div>
+          <div class="canvas-help">DRAG TO PAN <span>·</span> SCROLL TO ZOOM <span>·</span> SELECT A NODE</div>
+        </div>
+        <div class="detail-bar" id="detail-bar"><div class="detail-symbol">Φ</div><div class="detail-copy"><span>SELECTED ARTICLE</span><strong id="detail-title">Philosophy</strong><p id="detail-description">The destination at the heart of the experiment.</p></div><a id="detail-link" href="https://en.wikipedia.org/wiki/Philosophy" target="_blank" rel="noopener noreferrer">Open on Wikipedia ↗</a></div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>
