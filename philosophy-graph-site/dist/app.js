@@ -6,6 +6,8 @@
   const svgNS = 'http://www.w3.org/2000/svg';
   const els = {
     form: document.getElementById('trace-form'), input: document.getElementById('article-input'), button: document.getElementById('trace-button'),
+    funMode: document.getElementById('fun-mode'), ruleDescription: document.getElementById('rule-description'),
+    modeInfoButton: document.getElementById('mode-info-button'), modeInfo: document.getElementById('fun-mode-info'), modeHint: document.getElementById('mode-hint'),
     status: document.getElementById('status'), canvas: document.getElementById('canvas-wrap'), svg: document.getElementById('graph'),
     viewport: document.getElementById('viewport'), edges: document.getElementById('edges'), nodes: document.getElementById('nodes'),
     list: document.getElementById('path-list'), detailTitle: document.getElementById('detail-title'), detailDescription: document.getElementById('detail-description'),
@@ -14,7 +16,7 @@
   };
   const colors = ['#d6f878', '#83d8d1', '#c9a9ff', '#8bb7ff'];
   const LOOP_COLOR = '#ff9b70';
-  const state = { nodes: new Map(), edges: new Map(), paths: [], pageCache: new Map(), loopTargets: new Map(), cycleEdges: new Map(), selected: 'Philosophy', activePath: null, busy: false, scale: 1, tx: 0, ty: 0, pointer: null, raf: 0, frames: 0 };
+  const state = { nodes: new Map(), edges: new Map(), paths: [], pageCache: new Map(), loopTargets: new Map(), cycleEdges: new Map(), includeParentheses: els.funMode.checked, selected: 'Philosophy', activePath: null, busy: false, scale: 1, tx: 0, ty: 0, pointer: null, raf: 0, frames: 0 };
 
   function setStatus(message, error = false) {
     els.status.textContent = message;
@@ -50,7 +52,7 @@
   function isExcluded(element) {
     return element.closest('table, .hatnote, .infobox, .sidebar, .ambox, .thumb, .mw-empty-elt, .reflist, .navbox, .shortdescription, .metadata, .mw-heading, .reference, sup, figure, aside, blockquote') !== null;
   }
-  function firstEligibleLink(html) {
+  function firstEligibleLink(html, includeParentheses = false) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const root = doc.querySelector('.mw-parser-output') || doc.body;
     const paragraphs = [...root.querySelectorAll('p')].filter(p => !isExcluded(p));
@@ -72,7 +74,7 @@
         const inItalic = italic || el.matches('i,em');
         if (el.tagName === 'A') {
           const target = targetFromHref(el.getAttribute('href'));
-          if (target && !inItalic && !depth && !el.classList.contains('new')) { found = target; return; }
+          if (target && !inItalic && (includeParentheses || !depth) && !el.classList.contains('new')) { found = target; return; }
         }
         for (const child of el.childNodes) visit(child, inItalic);
       }
@@ -81,8 +83,9 @@
     }
     return null;
   }
-  async function fetchFirstLink(title) {
-    const key = title.toLowerCase();
+  async function fetchFirstLink(title, includeParentheses) {
+    const mode = includeParentheses ? 'fun' : 'standard';
+    const key = `${mode}:${title.toLowerCase()}`;
     if (state.pageCache.has(key)) return state.pageCache.get(key);
     const url = new URL(API);
     url.search = new URLSearchParams({ action: 'parse', page: title, prop: 'text', format: 'json', formatversion: '2', redirects: '1', origin: '*' });
@@ -93,9 +96,9 @@
     const data = await response.json();
     if (data.error) throw new Error(data.error.info || 'Wikipedia could not find that page.');
     if (!data.parse || typeof data.parse.text !== 'string') throw new Error('Wikipedia did not return article text.');
-    const result = { title: data.parse.title, next: firstEligibleLink(data.parse.text) };
+    const result = { title: data.parse.title, next: firstEligibleLink(data.parse.text, includeParentheses) };
     state.pageCache.set(key, result);
-    state.pageCache.set(result.title.toLowerCase(), result);
+    state.pageCache.set(`${mode}:${result.title.toLowerCase()}`, result);
     return result;
   }
   function addNode(title, near) {
@@ -273,8 +276,9 @@
   async function trace(raw) {
     if (state.busy) throw new Error('A path is already being traced.');
     const start = cleanTitle(raw);
+    const includeParentheses = state.includeParentheses;
     if (state.paths.some(path => path.sample)) resetGraph();
-    state.busy = true; els.button.disabled = true;
+    state.busy = true; els.button.disabled = true; els.funMode.disabled = true;
     const path = { start, titles: [], outcome: 'tracing', color: colors[state.paths.length % colors.length], error: '' };
     state.paths.push(path); state.activePath = path;
     let current = start;
@@ -283,7 +287,7 @@
     try {
       for (let step = 0; step <= MAX_STEPS; step++) {
         setStatus(`Reading ${current} · step ${step + 1}`);
-        const page = await fetchFirstLink(current);
+        const page = await fetchFirstLink(current, includeParentheses);
         current = page.title;
         if (step === 0) path.start = current;
         if (previous) addEdge(previous, current);
@@ -302,13 +306,13 @@
       }
     } catch (error) { path.outcome = 'error'; path.error = error.message || 'Could not finish this path.'; }
     finally {
-      state.busy = false; els.button.disabled = false; layoutLoops(); render(); kick();
+      state.busy = false; els.button.disabled = false; els.funMode.disabled = false; layoutLoops(); render(); kick();
       const summary = outcomeText(path);
       setStatus(`${path.start}: ${summary}`, path.outcome === 'error');
       if (path.titles.length) { selectNode(path.titles[0]); fitGraph(); }
       else { state.paths = state.paths.filter(p => p !== path); state.activePath = null; render(); }
     }
-    return { start: path.start, path: path.titles, outcome: path.outcome, message: outcomeText(path) };
+    return { start: path.start, mode: includeParentheses ? 'fun' : 'standard', path: path.titles, outcome: path.outcome, message: outcomeText(path) };
   }
   function resetGraph() {
     state.nodes.clear(); state.edges.clear(); state.paths = []; state.activePath = null;
@@ -316,6 +320,21 @@
     addNode('Philosophy'); selectNode('Philosophy'); render(); fitGraph();
   }
   els.form.addEventListener('submit', event => { event.preventDefault(); trace(els.input.value).catch(error => setStatus(error.message, true)); });
+  els.funMode.addEventListener('change', () => {
+    state.includeParentheses = els.funMode.checked;
+    els.ruleDescription.textContent = state.includeParentheses
+      ? 'Follow the first eligible link, including links in parentheses. Watch the route unfold, merge, loop, or stop.'
+      : 'Follow the first eligible link, skipping links in parentheses and italics. Watch the route unfold, merge, loop, or stop.';
+    els.modeHint.textContent = state.includeParentheses ? 'Include parentheses' : 'Original rule';
+    resetGraph();
+    setStatus(`${state.includeParentheses ? 'Fun' : 'Standard'} mode selected. Choose an article to begin.`);
+  });
+  function closeModeInfo() { els.modeInfo.hidden = true; els.modeInfoButton.setAttribute('aria-expanded', 'false'); }
+  els.modeInfoButton.addEventListener('click', () => {
+    els.modeInfo.hidden = !els.modeInfo.hidden;
+    els.modeInfoButton.setAttribute('aria-expanded', String(!els.modeInfo.hidden));
+  });
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') closeModeInfo(); });
   document.querySelectorAll('[data-example]').forEach(button => button.addEventListener('click', () => { els.input.value = button.dataset.example; trace(button.dataset.example).catch(error => setStatus(error.message, true)); }));
   document.getElementById('clear-button').addEventListener('click', () => { if (state.busy) return; resetGraph(); setStatus('Graph cleared. Choose an article to begin.'); });
   document.getElementById('zoom-in').addEventListener('click', () => zoom(1.25));
@@ -336,7 +355,7 @@
     try {
       Promise.resolve(document.modelContext.registerTool({
         name: 'trace_wikipedia_path', title: 'Trace a Wikipedia path',
-        description: 'Follow the first eligible link from an English Wikipedia article and add the route to the visible graph.',
+        description: 'Follow the first eligible link from an English Wikipedia article using the selected Fun mode setting, and add the route to the visible graph.',
         inputSchema: { type: 'object', properties: { article: { type: 'string', description: 'English Wikipedia article title or URL' } }, required: ['article'], additionalProperties: false },
         annotations: { readOnlyHint: false, untrustedContentHint: true },
         async execute(input) { if (!input || typeof input.article !== 'string') throw new Error('article must be a string'); els.input.value = input.article; return await trace(input.article); }
@@ -345,7 +364,7 @@
   }
   addNode('Philosophy');
   const examples = [
-    { start: 'Cat', titles: ['Cat', 'Carnivore', 'Animal', 'Multicellular organism', 'Organism', 'Life', 'Matter', 'Outline of physical science', 'Natural science', 'Empiricism', 'Epistemology', 'Philosophy'], outcome: 'reached', color: colors[0], sample: true },
+    { start: 'Cat', titles: ['Cat', 'Carnivore', 'Latin', 'Classical language', 'Language', 'Communication', 'Information', 'Abstract and concrete', 'Philosophy'], outcome: 'reached', color: colors[0], sample: true },
     { start: 'Moon', titles: ['Moon', 'Natural satellite', 'Astronomical object', 'Universe', 'Existence', 'Reality', 'Existence'], outcome: 'loop', color: colors[1], sample: true }
   ];
   for (const path of examples) {
