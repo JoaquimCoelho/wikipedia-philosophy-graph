@@ -55,8 +55,8 @@
   function firstEligibleLink(html, includeParentheses = false) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const root = doc.querySelector('.mw-parser-output') || doc.body;
-    const paragraphs = [...root.querySelectorAll('p')].filter(p => !isExcluded(p));
-    for (const paragraph of paragraphs) {
+    const blocks = [...root.querySelectorAll('p, li')].filter(block => !isExcluded(block));
+    for (const block of blocks) {
       let depth = 0;
       let found = null;
       function visit(node, italic = false) {
@@ -70,7 +70,7 @@
         }
         if (node.nodeType !== Node.ELEMENT_NODE) return;
         const el = node;
-        if (el !== paragraph && (el.matches('sup,style,script') || isExcluded(el))) return;
+        if (el !== block && (el.matches('sup,style,script') || isExcluded(el))) return;
         const inItalic = italic || el.matches('i,em');
         if (el.tagName === 'A') {
           const target = targetFromHref(el.getAttribute('href'));
@@ -78,7 +78,7 @@
         }
         for (const child of el.childNodes) visit(child, inItalic);
       }
-      visit(paragraph);
+      visit(block);
       if (found) return found;
     }
     return null;
