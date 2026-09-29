@@ -112,6 +112,22 @@
   }
   function addEdge(from, to) { const key = `${from}\u0000${to}`; if (!state.edges.has(key)) state.edges.set(key, { from, to }); }
   function pathEdgeKeys(path) { return path.titles.slice(1).map((title, i) => `${path.titles[i]}\u0000${title}`); }
+  function routeCounts(paths = state.paths) {
+    const routesByNode = new Map();
+    for (const path of paths) {
+      const route = path.start.toLowerCase();
+      for (const title of new Set(path.titles)) {
+        if (!routesByNode.has(title)) routesByNode.set(title, new Set());
+        routesByNode.get(title).add(route);
+      }
+    }
+    return new Map([...routesByNode].map(([title, routes]) => [title, routes.size]));
+  }
+  function nodeRadius(title, count) {
+    const base = title === 'Philosophy' ? 19 : 10;
+    return base + Math.min(16, 4 * Math.sqrt(Math.max(0, count - 1)));
+  }
+  function routeCountText(count) { return `${count} distinct route${count === 1 ? '' : 's'}`; }
   function layoutLoops() {
     state.loopTargets.clear(); state.cycleEdges.clear();
     const cycles = new Map();
@@ -151,9 +167,8 @@
       if (node) { node.x = target.x; node.y = target.y; node.vx = 0; node.vy = 0; }
     }
   }
-  function cycleArc(cycle) {
-    const gap = 15 / cycle.radius;
-    const start = cycle.start + gap, end = cycle.end - gap;
+  function cycleArc(cycle, fromRadius = 10, toRadius = 10) {
+    const start = cycle.start + (fromRadius + 5) / cycle.radius, end = cycle.end - (toRadius + 5) / cycle.radius;
     const x1 = cycle.x + cycle.radius * Math.cos(start), y1 = cycle.y + cycle.radius * Math.sin(start);
     const x2 = cycle.x + cycle.radius * Math.cos(end), y2 = cycle.y + cycle.radius * Math.sin(end);
     return `M ${x1} ${y1} A ${cycle.radius} ${cycle.radius} 0 ${end - start > Math.PI ? 1 : 0} 1 ${x2} ${y2}`;
@@ -188,7 +203,8 @@
     els.detailSymbol.textContent = title === 'Philosophy' ? 'Φ' : title.slice(0, 1).toUpperCase();
     els.detailLink.href = wikiURL(title);
     const next = [...state.edges.values()].find(e => e.from === title)?.to;
-    els.detailDescription.textContent = title === 'Philosophy' ? 'The destination at the heart of the experiment.' : next ? `Its first eligible link leads to ${next}.` : 'Open this article on Wikipedia to explore further.';
+    const description = title === 'Philosophy' ? 'The destination at the heart of the experiment.' : next ? `Its first eligible link leads to ${next}.` : 'Open this article on Wikipedia to explore further.';
+    els.detailDescription.textContent = `${description} Seen on ${routeCountText(routeCounts().get(title) || 0)}.`;
     renderGraph();
   }
   function element(name, attrs = {}) { const el = document.createElementNS(svgNS, name); for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value); return el; }
@@ -197,6 +213,8 @@
     const active = state.activePath;
     const activeEdges = new Set(active ? pathEdgeKeys(active) : []);
     const activeNodes = new Set(active ? active.titles : []);
+    const counts = routeCounts();
+    const radii = new Map([...state.nodes.keys()].map(title => [title, nodeRadius(title, counts.get(title) || 0)]));
     const loopPaths = state.paths.filter(path => path.outcome === 'loop');
     const loopEdges = new Set(loopPaths.flatMap(pathEdgeKeys));
     const loopNodes = new Set(loopPaths.flatMap(path => path.titles));
@@ -207,15 +225,18 @@
       const cycle = state.cycleEdges.get(key);
       const attrs = { class: 'edge' + (activeEdges.has(key) ? ' active' : '') + (loopEdges.has(key) ? ' loop' : '') + (cycle ? ' cycle' : '') };
       const length = Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
-      const inset = loopEdges.has(key) ? 14 / length : 0;
-      const line = cycle ? element('path', { ...attrs, d: cycleArc(cycle) }) : element('line', { ...attrs, x1: from.x, y1: from.y, x2: to.x - (to.x - from.x) * inset, y2: to.y - (to.y - from.y) * inset });
+      const startInset = Math.min(.45, (radii.get(edge.from) + 3) / length), endInset = Math.min(.45, (radii.get(edge.to) + 5) / length);
+      const dx = to.x - from.x, dy = to.y - from.y;
+      const line = cycle ? element('path', { ...attrs, d: cycleArc(cycle, radii.get(edge.from), radii.get(edge.to)) }) : element('line', { ...attrs, x1: from.x + dx * startInset, y1: from.y + dy * startInset, x2: to.x - dx * endInset, y2: to.y - dy * endInset });
       els.edges.append(line);
     }
     for (const node of state.nodes.values()) {
       const root = node.title === 'Philosophy';
-      const g = element('g', { class: `node${root ? ' root' : ''}${activeNodes.has(node.title) ? ' active' : ''}${loopNodes.has(node.title) ? ' loop' : ''}${state.selected === node.title ? ' selected' : ''}`, transform: `translate(${node.x} ${node.y})`, tabindex: '0', role: 'button', 'aria-label': `Select ${node.title}` });
-      const circle = element('circle', { r: root ? '19' : '10' });
-      const label = element('text', { x: root ? '0' : '0', y: root ? '-31' : '-19', 'text-anchor': 'middle' }); label.textContent = node.title;
+      const count = counts.get(node.title) || 0, radius = radii.get(node.title);
+      const g = element('g', { class: `node${root ? ' root' : ''}${activeNodes.has(node.title) ? ' active' : ''}${loopNodes.has(node.title) ? ' loop' : ''}${state.selected === node.title ? ' selected' : ''}`, transform: `translate(${node.x} ${node.y})`, tabindex: '0', role: 'button', 'aria-label': `Select ${node.title}, ${routeCountText(count)}`, 'data-route-count': count });
+      const tooltip = element('title'); tooltip.textContent = `${node.title} — ${routeCountText(count)}`; g.append(tooltip);
+      const circle = element('circle', { r: radius });
+      const label = element('text', { x: '0', y: -(radius + (root ? 12 : 9)), 'text-anchor': 'middle' }); label.textContent = node.title;
       if (root) { const phi = element('text', { x: '0', y: '10', 'text-anchor': 'middle', style: 'fill:#17261c;stroke:none;font:29px Georgia,serif' }); phi.textContent = 'Φ'; g.append(circle, phi, label); }
       else g.append(circle, label);
       g.addEventListener('click', event => { event.stopPropagation(); selectNode(node.title); });

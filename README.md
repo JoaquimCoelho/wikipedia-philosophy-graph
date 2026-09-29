@@ -6,6 +6,8 @@ An interactive graph for exploring the [Wikipedia first-link phenomenon](https:/
 
 The graph supports zooming, panning, node selection, and highlighting a route. Loop routes stay coral even when another route is selected, and their cycles are arranged as circular rings with directional arcs (including two-page and self loops). Two dated example routes give the page a useful starting view; the first live trace replaces those examples. Results can change as Wikipedia pages are edited.
 
+Node size shows how many distinct starting articles' routes pass through that page. Loop repetitions and retracing the same starting article do not inflate the count. Growth is capped, and hovering over a node shows its route count. Clearing the graph or changing mode resets the counts.
+
 ## Run locally
 
 The site is plain HTML, CSS, and JavaScript. Serve `philosophy-graph-site/dist` with any static file server, for example:
