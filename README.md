@@ -1,5 +1,7 @@
 # Paths to Philosophy
 
+[Open the hosted site](https://paths-to-philosophy-joaquim.quimpedro1997.chatgpt.site) (private to the owner).
+
 An interactive graph for exploring the [Wikipedia first-link phenomenon](https://en.wikipedia.org/wiki/Wikipedia:Getting_to_Philosophy). Enter any English Wikipedia article title or URL; the app fetches its current rendered article through the MediaWiki Action API, finds the first eligible article link in the main text, and repeats until it reaches Philosophy, encounters a loop, runs out of links, or reaches a 100-step safety limit.
 
 The graph supports zooming, panning, node selection, and highlighting a route. Two dated example routes give the page a useful starting view; the first live trace replaces those examples. Results can change as Wikipedia pages are edited. The often quoted 97% figure describes a 2016 snapshot, not a guarantee for today's pages.
