@@ -25,5 +25,8 @@
 .mode-info{margin-top:11px;padding:12px 13px;border:1px solid #3c535b;border-radius:7px;background:#0f1c26;color:#aebfc1;font-size:11px;line-height:1.65}
 .mode-info strong{font:600 12px 'Space Grotesk',sans-serif;color:var(--accent)}
 .mode-info p{margin:7px 0 0}
+.sidebar-foot p{margin:0 0 10px}
+.sidebar-foot p:last-child{margin-bottom:0}
+.sidebar-foot strong{color:#aebfc1}
 .graph-legend{flex-wrap:wrap;row-gap:8px;max-width:calc(100% - 85px)}
 .graph-legend .size-legend{color:#aebfc1}

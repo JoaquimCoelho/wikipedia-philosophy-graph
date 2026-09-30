@@ -30,3 +30,5 @@ The parser reads rendered article paragraphs and list items in order, so list-ba
 The code for the deployable static site is in [`philosophy-graph-site/dist`](philosophy-graph-site/dist). GitHub Actions deploys this directory to GitHub Pages on every push to `main`.
 
 Fun mode has one explicit shortcut: **Awareness → Philosophy**, regardless of the current order of Awareness's links. This keeps that bridge stable across Wikipedia edits. Standard mode still uses the first eligible link from the live article. The shortcut applies after redirect resolution and is included in the Fun mode explanation and Awareness's selected-node description.
+
+The page's “Why routes change” note explains the recurring reordering and reversions of Awareness's philosophy and psychology links, links to the article's edit history, and distinguishes the Fun mode shortcut from Standard mode's live link order.
