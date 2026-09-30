@@ -8,6 +8,8 @@ The graph supports zooming, panning, node selection, and highlighting a route. L
 
 Node size shows how many distinct starting articles' routes pass through that page. Loop repetitions and retracing the same starting article do not inflate the count. Growth is capped, and hovering over a node shows its route count. Clearing the graph or changing mode resets the counts.
 
+Routes entering the same loop share one ring, with separate branches for their approaches and shared nodes where they merge. Retracing a starting article selects its existing route, including when using a redirect such as Lenin for Vladimir Lenin.
+
 ## Run locally
 
 The site is plain HTML, CSS, and JavaScript. Serve `philosophy-graph-site/dist` with any static file server, for example:

@@ -131,36 +131,61 @@
   function layoutLoops() {
     state.loopTargets.clear(); state.cycleEdges.clear();
     const cycles = new Map();
-    let right = 180;
+    const incoming = new Map();
     for (const path of state.paths.filter(path => path.outcome === 'loop')) {
       const last = path.titles.at(-1);
       const entry = path.titles.findIndex(title => title.toLowerCase() === last.toLowerCase());
       const titles = path.titles.slice(entry, -1);
       if (!titles.length) continue;
       const key = titles.map(title => title.toLowerCase()).sort().join('\u0000');
-      let cycle = cycles.get(key);
-      if (!cycle) {
-        const radius = Math.max(90, titles.length * 135 / (2 * Math.PI));
-        cycle = { x: right + radius, y: 0, radius };
-        right += radius * 2 + 230;
-        cycles.set(key, cycle);
-        titles.forEach((title, i) => {
-          const angle = -Math.PI / 2 + i * 2 * Math.PI / titles.length;
-          state.loopTargets.set(title, { x: cycle.x + radius * Math.cos(angle), y: cycle.y + radius * Math.sin(angle) });
-          const next = titles[(i + 1) % titles.length];
-          state.cycleEdges.set(`${title}\u0000${next}`, { ...cycle, start: angle, end: angle + 2 * Math.PI / titles.length });
-        });
+      if (!cycles.has(key)) {
+        // Rotate without reversing the cycle so its orientation is stable across routes.
+        const first = titles.indexOf([...titles].sort()[0]);
+        cycles.set(key, [...titles.slice(first), ...titles.slice(0, first)]);
       }
-      // Keep the approach outside the ring; repeated routes share the same cycle.
-      const entryTarget = state.loopTargets.get(titles[0]);
-      const dx = (entryTarget.x - cycle.x) / cycle.radius, dy = (entryTarget.y - cycle.y) / cycle.radius;
-      for (let i = entry - 1; i >= 0; i--) {
-        const title = path.titles[i];
-        if (!state.loopTargets.has(title)) {
-          const distance = (entry - i) * 115;
-          state.loopTargets.set(title, { x: entryTarget.x + dx * distance, y: entryTarget.y + dy * distance });
+      for (let i = 0; i < entry; i++) {
+        const parent = path.titles[i + 1], child = path.titles[i];
+        if (!incoming.has(parent)) incoming.set(parent, new Set());
+        incoming.get(parent).add(child);
+      }
+    }
+    const children = title => [...(incoming.get(title) || [])].sort();
+    const widths = new Map();
+    function width(title) {
+      if (!widths.has(title)) widths.set(title, Math.max(240, title.length * 7 + 50, children(title).reduce((sum, child) => sum + width(child), 0)));
+      return widths.get(title);
+    }
+    let right = 180;
+    for (const [, titles] of [...cycles].sort(([a], [b]) => a.localeCompare(b))) {
+      const radius = Math.max(90, titles.length * 135 / (2 * Math.PI));
+      const targets = new Map(), arcs = new Map();
+      titles.forEach((title, i) => {
+        const angle = -Math.PI / 2 + i * 2 * Math.PI / titles.length;
+        const dx = Math.cos(angle), dy = Math.sin(angle);
+        const entryTarget = { x: radius * dx, y: radius * dy };
+        targets.set(title, entryTarget);
+        const next = titles[(i + 1) % titles.length];
+        arcs.set(`${title}\u0000${next}`, { x: 0, y: 0, radius, start: angle, end: angle + 2 * Math.PI / titles.length });
+        // Lay out the merged approach tree once, giving each branch its own lane.
+        function placeChildren(parent, depth, lane) {
+          const branches = children(parent);
+          let left = lane - branches.reduce((sum, child) => sum + width(child), 0) / 2;
+          for (const child of branches) {
+            const childLane = left + width(child) / 2;
+            targets.set(child, { x: entryTarget.x + dx * depth * 115 - dy * childLane, y: entryTarget.y + dy * depth * 115 + dx * childLane });
+            placeChildren(child, depth + 1, childLane);
+            left += width(child);
+          }
         }
-      }
+        placeChildren(title, 1, 0);
+      });
+      // Reserve space for the complete tree, including labels, between separate loops.
+      const minX = Math.min(-radius, ...[...targets].map(([title, point]) => point.x - Math.max(35, title.length * 3.5)));
+      const maxX = Math.max(radius, ...[...targets].map(([title, point]) => point.x + Math.max(35, title.length * 3.5)));
+      const shift = right - minX;
+      for (const [title, point] of targets) state.loopTargets.set(title, { x: point.x + shift, y: point.y });
+      for (const [key, arc] of arcs) state.cycleEdges.set(key, { ...arc, x: shift });
+      right += maxX - minX + 230;
     }
     for (const [title, target] of state.loopTargets) {
       const node = state.nodes.get(title);
@@ -300,7 +325,7 @@
     const includeParentheses = state.includeParentheses;
     if (state.paths.some(path => path.sample)) resetGraph();
     state.busy = true; els.button.disabled = true; els.funMode.disabled = true;
-    const path = { start, titles: [], outcome: 'tracing', color: colors[state.paths.length % colors.length], error: '' };
+    let path = { start, titles: [], outcome: 'tracing', color: colors[state.paths.length % colors.length], error: '' };
     state.paths.push(path); state.activePath = path;
     let current = start;
     let previous = null;
@@ -310,7 +335,16 @@
         setStatus(`Reading ${current} · step ${step + 1}`);
         const page = await fetchFirstLink(current, includeParentheses);
         current = page.title;
-        if (step === 0) path.start = current;
+        if (step === 0) {
+          path.start = current;
+          const existing = state.paths.find(candidate => candidate !== path && candidate.start.toLowerCase() === current.toLowerCase());
+          if (existing && existing.outcome !== 'error') {
+            state.paths = state.paths.filter(candidate => candidate !== path);
+            path = existing; state.activePath = existing;
+            break;
+          }
+          if (existing) state.paths = state.paths.filter(candidate => candidate !== existing);
+        }
         if (previous) addEdge(previous, current);
         if (visited.has(current.toLowerCase())) { path.titles.push(current); path.outcome = 'loop'; render(); kick(); break; }
         visited.add(current.toLowerCase());

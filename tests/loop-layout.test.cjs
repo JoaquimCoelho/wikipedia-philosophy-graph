@@ -61,3 +61,47 @@ test('distinct cycles have separate rings', () => {
   const two = state.cycleEdges.get('C\u0000D');
   assert.ok(two.x - one.x > one.radius + two.radius);
 });
+
+const lenin = ['Vladimir Lenin', 'Old Style and New Style dates', 'Julian calendar', 'Solar calendar', 'Calendar', 'Day', 'Time', 'Existence', 'Reality', 'Existence'];
+const moon = ['Moon', 'Natural satellite', 'Astronomical object', 'Universe', 'Existence', 'Reality', 'Existence'];
+
+test('Lenin and Moon have separate approach branches into one shared loop', () => {
+  const { state } = layout([lenin, moon]);
+  assert.equal(state.cycleEdges.size, 2);
+  assert.equal(state.loopTargets.size, 13);
+  const positions = [...state.loopTargets.values()];
+  for (let i = 0; i < positions.length; i++) for (let j = i + 1; j < positions.length; j++) {
+    assert.ok(Math.hypot(positions[i].x - positions[j].x, positions[i].y - positions[j].y) >= 110);
+  }
+  assert.ok(Math.abs(state.nodes.get('Time').x - state.nodes.get('Universe').x) >= 240);
+});
+
+test('merged suffixes stay shared while incoming branches occupy different lanes', () => {
+  const { state } = layout([['One', 'Shared', 'A', 'B', 'A'], ['Two', 'Shared', 'A', 'B', 'A']]);
+  assert.equal(state.loopTargets.size, 5);
+  const one = state.nodes.get('One'), two = state.nodes.get('Two');
+  assert.ok(Math.hypot(one.x - two.x, one.y - two.y) >= 240);
+});
+
+test('shared loop geometry is independent of trace order and cycle entry', () => {
+  const first = layout([lenin, moon]).state;
+  const second = layout([moon, lenin]).state;
+  for (const [title, point] of first.loopTargets) {
+    assert.equal(point.x, second.loopTargets.get(title).x);
+    assert.equal(point.y, second.loopTargets.get(title).y);
+  }
+  const rotated = layout([['Two', 'B', 'C', 'A', 'B'], ['One', 'A', 'B', 'C', 'A']]).state;
+  const original = layout([['One', 'A', 'B', 'C', 'A'], ['Two', 'B', 'C', 'A', 'B']]).state;
+  for (const [title, point] of original.loopTargets) {
+    assert.equal(point.x, rotated.loopTargets.get(title).x);
+    assert.equal(point.y, rotated.loopTargets.get(title).y);
+  }
+});
+
+test('separate cycles reserve space for their full approach trees', () => {
+  const routes = [['One', 'A', 'B', 'C', 'A'], ['Two', 'A', 'B', 'C', 'A'], ['Three', 'D', 'E', 'F', 'D'], ['Four', 'D', 'E', 'F', 'D']];
+  const { state } = layout(routes);
+  const rightOfFirst = Math.max(...routes.slice(0, 2).flat().map(title => state.nodes.get(title).x));
+  const leftOfSecond = Math.min(...routes.slice(2).flat().map(title => state.nodes.get(title).x));
+  assert.ok(leftOfSecond - rightOfFirst >= 230);
+});
