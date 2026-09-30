@@ -28,5 +28,6 @@
 .sidebar-foot p{margin:0 0 10px}
 .sidebar-foot p:last-child{margin-bottom:0}
 .sidebar-foot strong{color:#aebfc1}
+.intro h1{margin-top:0}
 .graph-legend{flex-wrap:wrap;row-gap:8px;max-width:calc(100% - 85px)}
 .graph-legend .size-legend{color:#aebfc1}
