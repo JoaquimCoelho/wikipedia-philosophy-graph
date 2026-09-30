@@ -96,7 +96,10 @@
     const data = await response.json();
     if (data.error) throw new Error(data.error.info || 'Wikipedia could not find that page.');
     if (!data.parse || typeof data.parse.text !== 'string') throw new Error('Wikipedia did not return article text.');
-    const result = { title: data.parse.title, next: firstEligibleLink(data.parse.text, includeParentheses) };
+    // Fun mode keeps this bridge stable when Awareness's opening link is reordered.
+    const next = includeParentheses && data.parse.title.toLowerCase() === 'awareness'
+      ? 'Philosophy' : firstEligibleLink(data.parse.text, includeParentheses);
+    const result = { title: data.parse.title, next };
     state.pageCache.set(key, result);
     state.pageCache.set(`${mode}:${result.title.toLowerCase()}`, result);
     return result;
@@ -228,7 +231,9 @@
     els.detailSymbol.textContent = title === 'Philosophy' ? 'Φ' : title.slice(0, 1).toUpperCase();
     els.detailLink.href = wikiURL(title);
     const next = [...state.edges.values()].find(e => e.from === title)?.to;
-    const description = title === 'Philosophy' ? 'The destination at the heart of the experiment.' : next ? `Its first eligible link leads to ${next}.` : 'Open this article on Wikipedia to explore further.';
+    const description = title === 'Philosophy' ? 'The destination at the heart of the experiment.'
+      : state.includeParentheses && title === 'Awareness' && next === 'Philosophy' ? 'Fun mode sends Awareness directly to Philosophy.'
+      : next ? `Its first eligible link leads to ${next}.` : 'Open this article on Wikipedia to explore further.';
     els.detailDescription.textContent = `${description} Seen on ${routeCountText(routeCounts().get(title) || 0)}.`;
     renderGraph();
   }
