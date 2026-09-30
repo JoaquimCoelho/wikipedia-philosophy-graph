@@ -12,11 +12,12 @@
     viewport: document.getElementById('viewport'), edges: document.getElementById('edges'), nodes: document.getElementById('nodes'),
     list: document.getElementById('path-list'), detailTitle: document.getElementById('detail-title'), detailDescription: document.getElementById('detail-description'),
     detailLink: document.getElementById('detail-link'), detailSymbol: document.querySelector('.detail-symbol'),
-    nodeCount: document.getElementById('node-count'), pathCount: document.getElementById('path-count'), stepCount: document.getElementById('step-count')
+    nodeCount: document.getElementById('node-count'), pathCount: document.getElementById('path-count'), stepCount: document.getElementById('step-count'),
+    untangle: document.getElementById('untangle')
   };
   const colors = ['#d6f878', '#83d8d1', '#c9a9ff', '#8bb7ff'];
   const LOOP_COLOR = '#ff9b70';
-  const state = { nodes: new Map(), edges: new Map(), paths: [], pageCache: new Map(), loopTargets: new Map(), cycleEdges: new Map(), includeParentheses: els.funMode.checked, selected: 'Philosophy', activePath: null, busy: false, scale: 1, tx: 0, ty: 0, pointer: null, raf: 0, frames: 0 };
+  const state = { nodes: new Map(), edges: new Map(), paths: [], pageCache: new Map(), loopTargets: new Map(), cycleEdges: new Map(), includeParentheses: els.funMode.checked, selected: 'Philosophy', activePath: null, busy: false, untangled: false, scale: 1, tx: 0, ty: 0, pointer: null, raf: 0, frames: 0 };
 
   function setStatus(message, error = false) {
     els.status.textContent = message;
@@ -297,7 +298,81 @@
     state.ty = rect.height / 2 - ((minY + maxY) / 2) * state.scale;
     transform();
   }
+  function layoutUntangled() {
+    layoutLoops();
+    const incoming = new Map(), outgoing = new Map();
+    for (const edge of state.edges.values()) {
+      if (!state.nodes.has(edge.from) || !state.nodes.has(edge.to)) continue;
+      outgoing.set(edge.from, edge.to);
+      if (!incoming.has(edge.to)) incoming.set(edge.to, new Set());
+      incoming.get(edge.to).add(edge.from);
+    }
+    const placed = new Set(state.loopTargets.keys());
+    const children = title => [...(incoming.get(title) || [])].filter(child => !state.loopTargets.has(child)).sort();
+    const heights = new Map();
+    function height(title, ancestors = new Set()) {
+      if (ancestors.has(title)) return 100;
+      if (!heights.has(title)) {
+        const next = new Set(ancestors).add(title);
+        heights.set(title, Math.max(100, children(title).reduce((sum, child) => sum + height(child, next), 0)));
+      }
+      return heights.get(title);
+    }
+    const roots = [...state.nodes.keys()].filter(title => !placed.has(title) && !outgoing.has(title))
+      .sort((a, b) => a === 'Philosophy' ? -1 : b === 'Philosophy' ? 1 : a.localeCompare(b));
+    let bottom = 0;
+    function placeTree(root, x, y) {
+      const layerWidths = [];
+      function measure(title, depth, seen = new Set()) {
+        if (seen.has(title)) return;
+        seen.add(title);
+        layerWidths[depth] = Math.max(layerWidths[depth] || 0, 70, title.length * 7 + 16);
+        for (const child of children(title)) measure(child, depth + 1, seen);
+      }
+      measure(root, 0);
+      const columns = [x];
+      for (let depth = 1; depth < layerWidths.length; depth++) {
+        columns[depth] = columns[depth - 1] - Math.max(115, (layerWidths[depth - 1] + layerWidths[depth]) / 2 + 28);
+      }
+      function place(title, depth, lane) {
+        if (placed.has(title)) return;
+        placed.add(title);
+        const node = state.nodes.get(title);
+        node.x = columns[depth]; node.y = lane; node.vx = 0; node.vy = 0;
+        const branches = children(title).filter(child => !placed.has(child));
+        let top = lane - branches.reduce((sum, child) => sum + height(child), 0) / 2;
+        for (const child of branches) {
+          place(child, depth + 1, top + height(child) / 2);
+          top += height(child);
+        }
+      }
+      place(root, 0, y);
+    }
+    // Each destination gets its own tree; merged suffixes remain a single branch.
+    for (const root of roots) {
+      const size = height(root), y = root === 'Philosophy' ? 0 : bottom + size / 2 + 150;
+      placeTree(root, 0, y);
+      bottom = y + size / 2;
+    }
+    // Include unfinished approaches joining a loop, and any disconnected nodes.
+    for (const title of [...state.nodes.keys()].sort()) {
+      if (placed.has(title)) continue;
+      const target = state.loopTargets.get(outgoing.get(title));
+      const size = height(title);
+      placeTree(title, target ? target.x - 190 : 0, bottom + size / 2 + 150);
+      bottom += size + 150;
+    }
+    const right = Math.max(0, ...[...state.nodes.values()].filter(node => !state.loopTargets.has(node.title)).map(node => node.x + node.title.length * 3.5 + 35));
+    const shift = Math.max(0, right + 150 - 180);
+    for (const [title, point] of state.loopTargets) {
+      point.x += shift;
+      const node = state.nodes.get(title);
+      node.x = point.x; node.y = point.y; node.vx = 0; node.vy = 0;
+    }
+    for (const arc of state.cycleEdges.values()) arc.x += shift;
+  }
   function simulate() {
+    if (state.untangled) { state.raf = 0; return; }
     state.frames++;
     const nodes = [...state.nodes.values()];
     const forces = new Map(nodes.map(n => [n.title, { x: 0, y: 0 }]));
@@ -323,13 +398,13 @@
     renderGraph();
     if (state.frames < 100) state.raf = requestAnimationFrame(simulate); else state.raf = 0;
   }
-  function kick() { state.frames = 0; if (!state.raf) state.raf = requestAnimationFrame(simulate); }
+  function kick() { if (state.untangled) return; state.frames = 0; if (!state.raf) state.raf = requestAnimationFrame(simulate); }
   async function trace(raw) {
     if (state.busy) throw new Error('A path is already being traced.');
     const start = cleanTitle(raw);
     const includeParentheses = state.includeParentheses;
-    if (state.paths.some(path => path.sample)) resetGraph();
-    state.busy = true; els.button.disabled = true; els.funMode.disabled = true;
+    if (state.paths.some(path => path.sample)) resetGraph(true);
+    state.busy = true; els.button.disabled = true; els.funMode.disabled = true; els.untangle.disabled = true;
     let path = { start, titles: [], outcome: 'tracing', color: colors[state.paths.length % colors.length], error: '' };
     state.paths.push(path); state.activePath = path;
     let current = start;
@@ -366,7 +441,9 @@
       }
     } catch (error) { path.outcome = 'error'; path.error = error.message || 'Could not finish this path.'; }
     finally {
-      state.busy = false; els.button.disabled = false; els.funMode.disabled = false; layoutLoops(); render(); kick();
+      state.busy = false; els.button.disabled = false; els.funMode.disabled = false; els.untangle.disabled = false;
+      if (state.untangled) layoutUntangled(); else layoutLoops();
+      render(); kick();
       const summary = outcomeText(path);
       setStatus(`${path.start}: ${summary}`, path.outcome === 'error');
       if (path.titles.length) { selectNode(path.titles[0]); fitGraph(); }
@@ -374,7 +451,8 @@
     }
     return { start: path.start, mode: includeParentheses ? 'fun' : 'standard', path: path.titles, outcome: path.outcome, message: outcomeText(path) };
   }
-  function resetGraph() {
+  function resetGraph(keepLayout = false) {
+    state.untangled = keepLayout && state.untangled;
     state.nodes.clear(); state.edges.clear(); state.paths = []; state.activePath = null;
     state.loopTargets.clear(); state.cycleEdges.clear();
     addNode('Philosophy'); selectNode('Philosophy'); render(); fitGraph();
@@ -400,6 +478,13 @@
   document.getElementById('zoom-in').addEventListener('click', () => zoom(1.25));
   document.getElementById('zoom-out').addEventListener('click', () => zoom(.8));
   document.getElementById('fit').addEventListener('click', fitGraph);
+  els.untangle.addEventListener('click', () => {
+    if (state.busy) return;
+    if (state.raf) cancelAnimationFrame(state.raf);
+    state.raf = 0; state.untangled = true;
+    layoutUntangled(); render(); fitGraph();
+    setStatus('Graph untangled. Branches are spaced out and shared paths stay together.');
+  });
   function zoom(factor, x = els.svg.clientWidth / 2, y = els.svg.clientHeight / 2) {
     const next = Math.max(.15, Math.min(4, state.scale * factor));
     state.tx = x - (x - state.tx) * next / state.scale; state.ty = y - (y - state.ty) * next / state.scale; state.scale = next; transform();

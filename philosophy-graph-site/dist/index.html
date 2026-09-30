@@ -7,8 +7,8 @@
   <meta name="description" content="Trace the first-link route from any English Wikipedia article and explore how paths converge on Philosophy.">
   <title>Paths to Philosophy — a Wikipedia first-link explorer</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23101923'/%3E%3Cpath d='M14 45 31 17l18 28M22 33h19' fill='none' stroke='%23d6f878' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="styles.css?v=top-copy-1">
-  <script src="app.js?v=awareness-fun-1" defer></script>
+  <link rel="stylesheet" href="styles.css?v=untangle-1">
+  <script src="app.js?v=untangle-1" defer></script>
 </head>
 <body>
   <div class="shell">
@@ -39,7 +39,7 @@
           <svg id="graph" role="img" aria-label="Graph of traced Wikipedia first-link routes"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#79909a"/></marker><marker id="loop-arrow" markerWidth="6" markerHeight="6" refX="6" refY="3" orient="auto"><path d="M0 0 L6 3 L0 6 Z" fill="#ff9b70"/></marker></defs><g id="viewport"><g id="edges"></g><g id="nodes"></g></g></svg>
           <div class="canvas-note"><span class="live-indicator"></span><span id="status" role="status">Choose an article to begin</span></div>
           <div class="graph-legend"><span><i class="route-key"></i>First-link route</span><span><i class="loop-key"></i>Loop route ↻</span><span class="size-legend">Larger nodes = more routes</span></div>
-          <div class="graph-controls"><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="fit" aria-label="Fit graph to view">⌗</button></div>
+          <div class="graph-controls"><button type="button" id="untangle" class="untangle-button" aria-label="Untangle graph" title="Space out branches and shared paths">Untangle</button><button type="button" id="zoom-in" aria-label="Zoom in">+</button><button type="button" id="zoom-out" aria-label="Zoom out">−</button><button type="button" id="fit" aria-label="Fit graph to view">⌗</button></div>
           <div class="canvas-help">DRAG TO PAN <span>·</span> SCROLL TO ZOOM <span>·</span> SELECT A NODE</div>
         </div>
         <div class="detail-bar" id="detail-bar"><div class="detail-symbol">Φ</div><div class="detail-copy"><span>SELECTED ARTICLE</span><strong id="detail-title">Philosophy</strong><p id="detail-description">The destination at the heart of the experiment.</p></div><a id="detail-link" href="https://en.wikipedia.org/wiki/Philosophy" target="_blank" rel="noopener noreferrer">Open on Wikipedia ↗</a></div>

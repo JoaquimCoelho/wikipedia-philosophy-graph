@@ -8,6 +8,8 @@ The graph supports zooming, panning, node selection, and highlighting a route. L
 
 Node size shows how many distinct starting articles' routes pass through that page. Loop repetitions and retracing the same starting article do not inflate the count. Growth is capped, and hovering over a node shows its route count. Clearing the graph or changing mode resets the counts.
 
+The **Untangle** button arranges routes into spaced branches, with shared suffixes merged and loops kept circular. It fits the result to the view and holds the layout still. Subsequent traces use the same arrangement until the graph is cleared or the mode is changed.
+
 Routes entering the same loop share one ring, with separate branches for their approaches and shared nodes where they merge. Retracing a starting article selects its existing route, including when using a redirect such as Lenin for Vladimir Lenin.
 
 The example buttons are Cat, Book, Genre, and Language. All four reached Philosophy in Fun mode when checked on 30 September 2026. The starting graph shows dated Cat and Book snapshots; live results can change as Wikipedia is edited.

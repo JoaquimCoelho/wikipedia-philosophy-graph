@@ -29,5 +29,8 @@
 .sidebar-foot p:last-child{margin-bottom:0}
 .sidebar-foot strong{color:#aebfc1}
 .intro h1{margin-top:0}
-.graph-legend{flex-wrap:wrap;row-gap:8px;max-width:calc(100% - 85px)}
+.graph-controls{align-items:flex-end}
+.graph-controls .untangle-button{width:76px;padding:0 8px;margin-bottom:4px;font-size:11px;font-weight:600}
+.graph-controls button:disabled{opacity:.5;cursor:wait}
+.graph-legend{flex-wrap:wrap;row-gap:8px;max-width:calc(100% - 115px)}
 .graph-legend .size-legend{color:#aebfc1}
