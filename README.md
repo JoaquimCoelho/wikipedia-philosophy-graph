@@ -10,6 +10,8 @@ Node size shows how many distinct starting articles' routes pass through that pa
 
 Routes entering the same loop share one ring, with separate branches for their approaches and shared nodes where they merge. Retracing a starting article selects its existing route, including when using a redirect such as Lenin for Vladimir Lenin.
 
+The example buttons are Cat, Book, Genre, and Language. All four reached Philosophy in Fun mode when checked on 30 September 2026. The starting graph shows dated Cat and Book snapshots; live results can change as Wikipedia is edited.
+
 ## Run locally
 
 The site is plain HTML, CSS, and JavaScript. Serve `philosophy-graph-site/dist` with any static file server, for example:

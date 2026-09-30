@@ -420,7 +420,7 @@
   addNode('Philosophy');
   const examples = [
     { start: 'Cat', titles: ['Cat', 'Carnivore', 'Latin', 'Classical language', 'Language', 'Communication', 'Information', 'Abstract and concrete', 'Philosophy'], outcome: 'reached', color: colors[0], sample: true },
-    { start: 'Moon', titles: ['Moon', 'Natural satellite', 'Astronomical object', 'Universe', 'Existence', 'Reality', 'Existence'], outcome: 'loop', color: colors[1], sample: true }
+    { start: 'Book', titles: ['Book', 'Writing', 'Language', 'Communication', 'Information', 'Abstract and concrete', 'Philosophy'], outcome: 'reached', color: colors[1], sample: true }
   ];
   for (const path of examples) {
     state.paths.push(path);
@@ -430,5 +430,5 @@
     }
   }
   layoutLoops(); render(); kick(); requestAnimationFrame(fitGraph);
-  setStatus('Example paths from 29 September 2026. Trace an article for live results.');
+  setStatus('Example paths from 30 September 2026. Trace an article for live results.');
 })();
